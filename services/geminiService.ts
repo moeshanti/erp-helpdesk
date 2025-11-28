@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // [CONFIG] Hardcoded API Key for Browser Support
-const API_KEY = 'AIzaSyCqd83Twt8_qo2i5mykb-K-WlSr5cQihxk'; 
+const API_KEY = 'AIzaSyBOS9Ziqt5SbmoiPAeVv9UsU2jQvgDFucY'; 
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
