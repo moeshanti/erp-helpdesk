@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
 // [CONFIG] Hardcoded API Key for Browser Support
-const API_KEY = 'AIzaSyBOS9Ziqt5SbmoiPAeVv9UsU2jQvgDFucY'; 
-
+//const API_KEY = 'AIzaSyBOS9Ziqt5SbmoiPAeVv9UsU2jQvgDFucY'; 
+const API_KEY = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export interface ImagePart {
