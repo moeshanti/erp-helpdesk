@@ -1,7 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// [NETLIFY FIX] Hardcoded API Key for client-side execution
+// In a strict production app, you would proxy this, but for this demo, this enables the AI features.
+const API_KEY = 'AIzaSyCqd83Twt8_qo2i5mykb-K-WlSr5cQihxk'; 
+
+const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export interface ImagePart {
     inlineData: {
@@ -15,13 +18,12 @@ export const analyzeTicketAttachment = async (
   context: string,
   isCreationMode: boolean = false
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "Error: API Key is missing. Please configure process.env.API_KEY.";
+  if (!API_KEY) {
+    return "Error: Gemini API Key is missing in configuration.";
   }
 
   try {
     const modelId = 'gemini-2.5-flash'; 
-
     let promptText = `You are a Senior 1C:Enterprise ERP Expert and Developer. 
     Analyze the provided screenshot(s) which are attachments in a 1C ERP Helpdesk Ticket.
     Context provided by user: "${context}".`;
