@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-// [NETLIFY FIX] Hardcoded API Key for client-side execution
-// In a strict production app, you would proxy this, but for this demo, this enables the AI features.
+// [CONFIG] Hardcoded API Key for Browser Support
 const API_KEY = 'AIzaSyCqd83Twt8_qo2i5mykb-K-WlSr5cQihxk'; 
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -13,63 +12,81 @@ export interface ImagePart {
     }
 }
 
+// Helper to downscale image if it's too large
+const compressImage = async (base64Str: string, maxWidth = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = `data:image/jpeg;base64,${base64Str}`;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      
+      // Get new base64, remove prefix
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl.split(',')[1]);
+    };
+    img.onerror = () => resolve(base64Str); // Fail safe
+  });
+};
+
 export const analyzeTicketAttachment = async (
   images: ImagePart[],
   context: string,
   isCreationMode: boolean = false
 ): Promise<string> => {
   if (!API_KEY) {
-    return "Error: Gemini API Key is missing in configuration.";
+    return "AI Analysis Unavailable: API Key missing.";
   }
 
   try {
+    // 1. Optimizing Images
+    const optimizedImages = await Promise.all(images.map(async (img) => {
+        const compressedData = await compressImage(img.inlineData.data);
+        return {
+            inlineData: {
+                data: compressedData,
+                mimeType: 'image/jpeg' // Standardize to jpeg
+            }
+        };
+    }));
+
     const modelId = 'gemini-2.5-flash'; 
-    let promptText = `You are a Senior 1C:Enterprise ERP Expert and Developer. 
-    Analyze the provided screenshot(s) which are attachments in a 1C ERP Helpdesk Ticket.
-    Context provided by user: "${context}".`;
+    let promptText = `You are a Senior 1C:Enterprise ERP Expert. Analyze the provided screenshot(s). Context: "${context}".`;
 
     if (isCreationMode) {
         promptText += `
-        The user is currently attempting to create a ticket.
-        
-        Please provide your response in the following strict format:
-        
-        **Suggested Title:** 
-        [Write a short, professional ticket subject line here based on the images]
-
-        **Steps to Reproduce:**
-        [Deduce probable steps to reproduce this error based on the screen context (e.g. 1. Open 'Sales Order'. 2. Click 'Post'.). Keep it concise.]
-        
-        **Analysis:**
-        [Provide a friendly, concise analysis of the error for the user here. If it's a common error like 'Period Closed', suggest a fix.]
-        `;
+        User is creating a ticket. Response Format:
+        **Suggested Title:** [Subject]
+        **Steps to Reproduce:** [Concise Steps]
+        **Analysis:** [Friendly advice]`;
     } else {
         promptText += `
-        These screenshots were added to an existing ticket comment. Provide a deep technical analysis for the ERP support team.
-        
-        1. **Error Extraction**: Perform OCR to extract exact 1C error codes, message text, and object names (e.g., "Document.Invoice", "Catalog.Partners").
-        2. **1C Context**: Identify if this is a platform error (1cv8.exe crash), a configuration error (Managed Forms issue), or a data error (Duplicate Key, Posting Lock).
-        3. **Troubleshooting**: Suggest where to check in the 1C Designer or Enterprise mode (e.g., "Check the Event Log (Zhurnal Registratsii)", "Debug the 'Posting' event module", "Check Functional Options").
-        4. **Solution**: If possible, suggest a code fix or a data correction step.
-        
-        Format the output using Markdown with bold headers like "**1C Error Analysis**" and "**Suggested Solution**".`;
+        Deep technical analysis for ERP support. Format with Markdown headers.`;
     }
 
     const contents = {
         parts: [
-            ...images.map(img => ({ inlineData: img.inlineData })),
+            ...optimizedImages, 
             { text: promptText }
         ]
     };
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: contents,
-    });
-
-    return response.text || "No analysis could be generated.";
-  } catch (error) {
-    console.error("Gemini Analysis Error:", error);
-    return "Failed to analyze the image(s). Please try again later.";
+    const response = await ai.models.generateContent({ model: modelId, contents });
+    return response.text || "No analysis generated.";
+  } catch (error: any) {
+    console.error("Gemini Analysis Error Details:", error);
+    // Return the actual error message for debugging
+    return `Failed to analyze. Error: ${error.message || error.toString()}`;
   }
 };
